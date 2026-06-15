@@ -1,11 +1,7 @@
-import { Message, TextChannel, NewsChannel, EmbedBuilder, ChannelType } from "discord.js";
+import { Message, TextChannel, NewsChannel } from "discord.js";
 import { db, usersTable, duelsTable, tellonymTable, guildSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
-
-const COLOR_SUCCESS = 0x57f287;
-const COLOR_ERROR   = 0xed4245;
-const COLOR_GOLD    = 0xfee75c;
 
 function isSendable(ch: Message["channel"]): ch is TextChannel | NewsChannel {
   return ch instanceof TextChannel || ch instanceof NewsChannel;
@@ -41,48 +37,6 @@ export async function handleDuel(message: Message, args: string[]): Promise<void
     return;
   }
 
-  const betText = bet > 0 ? ` por **${bet.toLocaleString("pt-BR")} coins**` : "";
-
-  const challengeEmbed = new EmbedBuilder()
-    .setColor(COLOR_GOLD)
-    .setTitle("⚔️ Desafio de Duelo!")
-    .setDescription(
-      `**${challenger.username}** desafiou **${mention.username}** para um duelo${betText}!\n\n` +
-      `${mention}, você aceita o desafio?\n` +
-      `Digite \`aceitar\` ou \`recusar\` em **30 segundos**.`
-    )
-    .setTimestamp();
-
-  const challengeMsg = await message.reply({ embeds: [challengeEmbed] });
-
-  const filter = (m: Message) =>
-    m.author.id === mention.id &&
-    ["aceitar", "recusar", "accept", "decline"].includes(m.content.toLowerCase().trim());
-
-  let response: Message | null = null;
-  try {
-    const collected = await message.channel.awaitMessages({ filter, max: 1, time: 30_000, errors: ["time"] });
-    response = collected.first() ?? null;
-  } catch {
-    await challengeMsg.edit({
-      embeds: [new EmbedBuilder().setColor(COLOR_ERROR)
-        .setDescription(`⏰ **${mention.username}** não respondeu a tempo. Duelo cancelado.`)],
-    });
-    return;
-  }
-
-  const accepted =
-    response?.content.toLowerCase().trim() === "aceitar" ||
-    response?.content.toLowerCase().trim() === "accept";
-
-  if (!accepted) {
-    await message.reply({
-      embeds: [new EmbedBuilder().setColor(COLOR_ERROR)
-        .setDescription(`❌ **${mention.username}** recusou o duelo!`)],
-    });
-    return;
-  }
-
   const challengerWins = Math.random() < 0.5;
   const winner = challengerWins ? challenger : mention;
   const loser  = challengerWins ? mention : challenger;
@@ -108,17 +62,11 @@ export async function handleDuel(message: Message, args: string[]): Promise<void
     guildName: guild.name,
   });
 
-  await message.reply({
-    embeds: [new EmbedBuilder()
-      .setColor(COLOR_SUCCESS)
-      .setTitle("⚔️ Resultado do Duelo!")
-      .setDescription(
-        `**${challenger.username}** vs **${mention.username}**${betText}\n\n` +
-        `🏆 **${winner.username}** venceu!` +
-        (bet > 0 ? `\n🪙 +**${bet.toLocaleString("pt-BR")} coins** para **${winner.username}**` : "")
-      )
-      .setTimestamp()],
-  });
+  const betText = bet > 0 ? ` por **${bet.toLocaleString("pt-BR")} coins**` : "";
+  await message.reply(
+    `⚔️ **${challenger.username}** desafiou **${mention.username}** para um duelo${betText}!\n\n` +
+    `🏆 **${winner.username}** venceu!${bet > 0 ? ` +${bet.toLocaleString("pt-BR")} coins` : ""}`
+  );
 }
 
 export async function handleTellonym(message: Message, args: string[]): Promise<void> {
@@ -163,25 +111,15 @@ export async function handleTellonym(message: Message, args: string[]): Promise<
 
   try { await message.delete(); } catch { /* no perm */ }
 
-  // Look up configured tellonym channel for this guild
   const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guild.id));
-  const tellonymChannelId = (settings as any)?.tellonymChannelId as string | null | undefined;
-
-  let notified = false;
+  const tellonymChannelId = settings?.tellonymChannelId;
 
   if (tellonymChannelId) {
-    try {
-      const ch = guild.channels.cache.get(tellonymChannelId);
-      if (ch && ch.type === ChannelType.GuildText) {
-        await (ch as TextChannel).send(
-          `📬 **${mention}**, você recebeu uma mensagem anônima! Use \`linbox\` para ver sua caixa de entrada.`
-        );
-        notified = true;
-      }
-    } catch { /* channel unavailable */ }
-  }
-
-  if (!notified) {
+    const ch = guild.channels.cache.get(tellonymChannelId);
+    if (ch instanceof TextChannel) {
+      await ch.send(`📬 **${mention}** você recebeu uma mensagem anônima!\n> ${msgText}\n\n_Use \`linbox\` para ver sua caixa de entrada._`).catch(() => null);
+    }
+  } else {
     try {
       await mention.send(
         `📬 **Você recebeu uma mensagem anônima em ${guild.name}!**\n\n> ${msgText}\n\n_Use \`linbox\` no servidor para ver sua caixa de entrada._`

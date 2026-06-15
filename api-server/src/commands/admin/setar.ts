@@ -1,7 +1,7 @@
-import { ChannelType, EmbedBuilder, Message, PermissionFlagsBits, TextChannel } from "discord.js";
+import { EmbedBuilder, Message, PermissionFlagsBits, ChannelType, TextChannel } from "discord.js";
 import { db, guildSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { COLOR_ERROR, COLOR_SUCCESS, authorFooter } from "../util.js";
+import { COLOR_SUCCESS, COLOR_ERROR, authorFooter } from "../util.js";
 
 export default async function setar(message: Message, args: string[]): Promise<void> {
   if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -12,22 +12,14 @@ export default async function setar(message: Message, args: string[]): Promise<v
   const subCmd = args[0]?.toLowerCase();
 
   if (!subCmd) {
-    await message.reply({
-      embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription(
-        "❌ Uso disponível:\n" +
-        "`lsetar prefix <novo_prefixo>` — altera o prefixo do bot\n" +
-        "`lsetar tellonym #canal` — define o canal para notificações anônimas\n" +
-        "`lsetar tellonym desativar` — remove o canal configurado"
-      )],
-    });
+    await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar prefix <prefixo>` ou `lsetar tellonym #canal`")] });
     return;
   }
 
-  // ── prefix ────────────────────────────────────────────────────────────────
   if (subCmd === "prefix" || subCmd === "prefixo") {
     const value = args[1];
     if (!value) {
-      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Informe o novo prefixo! Ex: `lsetar prefix !`")] });
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar prefix <novo_prefixo>`")] });
       return;
     }
     if (value.length > 5) {
@@ -35,65 +27,31 @@ export default async function setar(message: Message, args: string[]): Promise<v
       return;
     }
     await db.update(guildSettingsTable).set({ prefix: value }).where(eq(guildSettingsTable.id, message.guild!.id));
-    await message.reply({
-      embeds: [new EmbedBuilder()
-        .setColor(COLOR_SUCCESS)
-        .setAuthor(authorFooter(message))
-        .setDescription(`✅ Prefixo alterado para \`${value}\``)
-        .setTimestamp()],
-    });
+    const embed = new EmbedBuilder()
+      .setColor(COLOR_SUCCESS)
+      .setAuthor(authorFooter(message))
+      .setDescription(`✅ Prefixo alterado para \`${value}\``)
+      .setTimestamp();
+    await message.reply({ embeds: [embed] });
     return;
   }
 
-  // ── tellonym ──────────────────────────────────────────────────────────────
-  // Requires column `tellonymChannelId text` in guildSettingsTable (@workspace/db migration)
-  if (subCmd === "tellonym" || subCmd === "anon") {
-    const second = args[1]?.toLowerCase();
-
-    if (second === "desativar" || second === "off" || second === "disable") {
-      await db
-        .update(guildSettingsTable)
-        .set({ tellonymChannelId: null } as any)
-        .where(eq(guildSettingsTable.id, message.guild!.id));
-      await message.reply({
-        embeds: [new EmbedBuilder()
-          .setColor(COLOR_SUCCESS)
-          .setDescription("✅ Canal do tellonym desativado.\nNotificações voltarão a ser enviadas por DM.")
-          .setTimestamp()],
-      });
+  if (subCmd === "tellonym") {
+    const sub2 = args[1]?.toLowerCase();
+    if (sub2 === "desativar" || sub2 === "disable" || sub2 === "off") {
+      await db.update(guildSettingsTable).set({ tellonymChannelId: null }).where(eq(guildSettingsTable.id, message.guild!.id));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription("✅ Canal do tellonym removido. Notificações serão enviadas por DM.")] });
       return;
     }
-
     const channel = message.mentions.channels.first();
     if (!channel || channel.type !== ChannelType.GuildText) {
-      await message.reply({
-        embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription(
-          "❌ Mencione um canal de texto!\n" +
-          "Ex: `lsetar tellonym #anônimos`\n" +
-          "Para desativar: `lsetar tellonym desativar`"
-        )],
-      });
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Mencione um canal de texto!\nEx: `lsetar tellonym #canal`\nPara desativar: `lsetar tellonym desativar`")] });
       return;
     }
-
-    await db
-      .update(guildSettingsTable)
-      .set({ tellonymChannelId: (channel as TextChannel).id } as any)
-      .where(eq(guildSettingsTable.id, message.guild!.id));
-
-    await message.reply({
-      embeds: [new EmbedBuilder()
-        .setColor(COLOR_SUCCESS)
-        .setAuthor(authorFooter(message))
-        .setDescription(`✅ Canal do tellonym configurado para ${channel}!\nAs notificações de mensagens anônimas serão enviadas lá.`)
-        .setTimestamp()],
-    });
+    await db.update(guildSettingsTable).set({ tellonymChannelId: channel.id }).where(eq(guildSettingsTable.id, message.guild!.id));
+    await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Canal de tellonym configurado para <#${channel.id}>.\nAs notificações de mensagens anônimas serão enviadas lá.`)] });
     return;
   }
 
-  await message.reply({
-    embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription(
-      "❌ Subcomando desconhecido.\nUse `lsetar prefix <valor>` ou `lsetar tellonym #canal`"
-    )],
-  });
+  await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Subcomando desconhecido.\nUse `lsetar prefix <valor>` ou `lsetar tellonym #canal`")] });
 }

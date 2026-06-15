@@ -22,7 +22,17 @@ import afk, { checkAfk } from "../commands/social/afk.js";
 import perfil from "../commands/social/perfil.js";
 import rep from "../commands/social/rep.js";
 import casar from "../commands/social/casar.js";
-import { beijar, abracar, socar, carinho, chorar, morder, cutucar, dancar, acenar, rir, sorrir, dormir, pensar, piscar, chutar, highfive, nomnom } from "../commands/social/gif.js";
+import { beijar, abracar, socar, carinho, chorar, morder, cutucar } from "../commands/social/gif.js";
+import dancar from "../commands/social/dancar.js";
+import acenar from "../commands/social/acenar.js";
+import rir from "../commands/social/rir.js";
+import sorrir from "../commands/social/sorrir.js";
+import dormir from "../commands/social/dormir.js";
+import pensar from "../commands/social/pensar.js";
+import piscar from "../commands/social/piscar.js";
+import chutar from "../commands/social/chutar.js";
+import highfive from "../commands/social/highfive.js";
+import nomnom from "../commands/social/nomnom.js";
 
 import slot from "../commands/games/slot.js";
 import blackjack from "../commands/games/blackjack.js";
@@ -40,8 +50,10 @@ import setar from "../commands/admin/setar.js";
 import resetar from "../commands/admin/resetar.js";
 import anunciar from "../commands/admin/anunciar.js";
 
-// ── Duel & Tellonym (inline) ─────────────────────────────────────────────────
-import { handleDuel, handleTellonym, handleInbox } from "./bot-features.js";
+import duelo from "../commands/games/duelo.js";
+
+// ── Tellonym (inline) ────────────────────────────────────────────────────────
+import { handleTellonym, handleInbox } from "./bot-features.js";
 
 // ── Aliases multilíngues → comando canônico ─────────────────────────────────
 const ALIASES: Record<string, string> = {
@@ -121,29 +133,40 @@ const ALIASES: Record<string, string> = {
   // cutucar
   cutucar:"cutucar", poke:"cutucar", prod:"cutucar", stupire:"cutucar",
   "ツンツン":"cutucar", "찌르다":"cutucar", "戳":"cutucar",
+  // dancar
+  dancar:"dancar", "dançar":"dancar", dance:"dancar", danse:"dancar",
+  "tanzen":"dancar", danzare:"dancar", "танцевать":"dancar", "踊る":"dancar",
+  "춤추다":"dancar", "跳舞":"dancar",
+  // acenar
+  acenar:"acenar", wave:"acenar", agitar:"acenar",
+  "あいさつ":"acenar", "손흔들기":"acenar", "挥手":"acenar",
+  // rir
+  rir:"rir", laugh:"rir", lol:"rir", haha:"rir", rire:"rir", lachen:"rir",
+  ridere:"rir", "笑う":"rir", "웃다":"rir", "笑":"rir",
+  // sorrir
+  sorrir:"sorrir", smile:"sorrir", sourire:"sorrir", lächeln:"sorrir",
+  sorridere:"sorrir", "улыбаться":"sorrir", "ほほえむ":"sorrir", "미소":"sorrir", "微笑":"sorrir",
+  // dormir
+  dormir:"dormir", sleep:"dormir", "schlafen":"dormir", slumber:"dormir",
+  "眠る":"dormir", "자다":"dormir", "睡觉":"dormir",
+  // pensar
+  pensar:"pensar", think:"pensar", "penser":"pensar", "denken":"pensar",
+  "pensare":"pensar", "思う":"pensar", "생각하다":"pensar", "思考":"pensar",
+  // piscar
+  piscar:"piscar", wink:"piscar", "blinzeln":"piscar", "cligner":"piscar",
+  "まばたき":"piscar", "윙크":"piscar", "眨眼":"piscar",
+  // chutar
+  chutar:"chutar", kick:"chutar", "treten":"chutar", "donner un coup":"chutar",
+  "蹴る":"chutar", "차다":"chutar", "踢":"chutar",
+  // highfive
+  highfive:"highfive", "high5":"highfive", "high-five":"highfive", "hi5":"highfive",
+  "ハイタッチ":"highfive", "하이파이브":"highfive", "击掌":"highfive",
+  // nomnom
+  nomnom:"nomnom", nom:"nomnom", eat:"nomnom", comer:"nomnom", manger:"nomnom",
+  "essen":"nomnom", mangiare:"nomnom", "食べる":"nomnom", "먹다":"nomnom", "吃":"nomnom",
   // chorar
   chorar:"chorar", cry:"chorar", weep:"chorar", pleurer:"chorar", weinen:"chorar",
   piangere:"chorar", "плакать":"chorar", "泣く":"chorar", "울다":"chorar", "哭":"chorar",
-  // dancar
-  dancar:"dancar", "dançar":"dancar", dance:"dancar", "ダンス":"dancar", "댄스":"dancar", "舞蹈":"dancar",
-  // acenar
-  acenar:"acenar", wave:"acenar", "手を振る":"acenar", "흔들다":"acenar", "挥手":"acenar",
-  // rir
-  rir:"rir", laugh:"rir", lol:"rir", haha:"rir", "笑う":"rir", "웃다":"rir", "笑":"rir",
-  // sorrir
-  sorrir:"sorrir", smile:"sorrir", "微笑む":"sorrir", "웃음":"sorrir", "微笑":"sorrir",
-  // dormir
-  dormir:"dormir", sleep:"dormir", "眠る":"dormir", "자다":"dormir", "睡觉":"dormir",
-  // pensar
-  pensar:"pensar", think:"pensar", "考える":"pensar", "생각하다":"pensar", "思考":"pensar",
-  // piscar
-  piscar:"piscar", wink:"piscar", "ウィンク":"piscar", "윙크":"piscar", "眨眼":"piscar",
-  // chutar
-  chutar:"chutar", kick:"chutar", "蹴る":"chutar", "차다":"chutar", "踢":"chutar",
-  // highfive
-  highfive:"highfive", "high5":"highfive", "high-five":"highfive",
-  // nomnom
-  nomnom:"nomnom", nom:"nomnom", eat:"nomnom", comer:"nomnom", "食べる":"nomnom", "먹다":"nomnom", "吃":"nomnom",
   // casar
   casar:"casar", marry:"casar", wedding:"casar", heiraten:"casar", marier:"casar",
   sposare:"casar", "жениться":"casar", "結婚":"casar", "결혼":"casar",
@@ -301,7 +324,7 @@ export async function startBot(): Promise<void> {
         case "blackjack":  return void await blackjack(message, args);
         case "dados":      return void await dados(message, args);
         case "roleta":     return void await roleta(message, args);
-        case "duelo":      return void await handleDuel(message, args);
+        case "duelo":      return void await duelo(message, args);
         // Music
         case "play":       return void await play(message, args);
         case "skip":       return void await skip(message);
