@@ -3,5 +3,3 @@ buildCommand = "npm install && npm run build"
 
 [deploy]
 startCommand = "npm run db:push && node api-server/dist/index.js"
-restartPolicyType = "on-failure"
-restartPolicyMaxRetries = 5
