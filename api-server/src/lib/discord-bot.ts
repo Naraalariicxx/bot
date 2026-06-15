@@ -1,8 +1,8 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import { db, usersTable, commandLogsTable, guildSettingsTable, duelsTable, tellonymTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { logger } from "./logger";
-import { setBotInfo } from "../routes/bot";
+import { logger } from "./logger.js";
+import { setBotInfo } from "../routes/bot.js";
 
 // ── Command imports ─────────────────────────────────────────────────────────
 import saldo from "../commands/economy/saldo.js";

@@ -1,4 +1,4 @@
-import { EmbedBuilder, Message } from "discord.js";
+import { EmbedBuilder, Message, TextChannel } from "discord.js";
 import { db, usersTable, duelsTable } from "../../database/db.js";
 import { eq } from "drizzle-orm";
 
@@ -60,7 +60,7 @@ export default async function duelo(message: Message, args: string[]): Promise<v
 
   let response: Message | null = null;
   try {
-    const collected = await message.channel.awaitMessages({ filter, max: 1, time: 30_000, errors: ["time"] });
+    const collected = await (message.channel as TextChannel).awaitMessages({ filter, max: 1, time: 30_000, errors: ["time"] });
     response = collected.first() ?? null;
   } catch {
     await challengeMsg.edit({

@@ -21,8 +21,8 @@ export default async function equipar(message: Message, args: string[]): Promise
 
   const [shopItem] = await db.select().from(shopItemsTable).where(eq(shopItemsTable.id, itemId));
 
-  const alreadyEquipped = invItem.equipped === 1;
-  await db.update(inventoryTable).set({ equipped: alreadyEquipped ? 0 : 1 }).where(eq(inventoryTable.id, invItem.id));
+  const alreadyEquipped = invItem.equipped === true;
+  await db.update(inventoryTable).set({ equipped: !alreadyEquipped }).where(eq(inventoryTable.id, invItem.id));
 
   const embed = new EmbedBuilder()
     .setColor(COLOR_SUCCESS)

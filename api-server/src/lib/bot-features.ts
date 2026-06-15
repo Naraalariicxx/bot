@@ -1,7 +1,7 @@
 import { Message, TextChannel, NewsChannel } from "discord.js";
 import { db, usersTable, duelsTable, tellonymTable, guildSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 function isSendable(ch: Message["channel"]): ch is TextChannel | NewsChannel {
   return ch instanceof TextChannel || ch instanceof NewsChannel;
