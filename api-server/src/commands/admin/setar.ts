@@ -43,7 +43,7 @@ export default async function setar(message: Message, args: string[]): Promise<v
 
     if (sub2 === "desativar") {
       await db.update(guildSettingsTable)
-        .set({ tellonymPanelChannelId: null, tellonymSendChannelId: null, tellonymApproveChannelId: null })
+        .set({ tellonymChannelId: null, tellonymSendChannelId: null, tellonymApproveChannelId: null })
         .where(eq(guildSettingsTable.id, guildId));
       await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription("✅ Sistema de tellonym desativado.")] });
       return;
@@ -51,11 +51,11 @@ export default async function setar(message: Message, args: string[]): Promise<v
 
     if (sub2 === "setup") {
       const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guildId));
-      if (!settings?.tellonymPanelChannelId) {
+      if (!settings?.tellonymChannelId) {
         await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Configure o canal do painel primeiro: `lsetar tellonym painel #canal`")] });
         return;
       }
-      const ch = message.guild!.channels.cache.get(settings.tellonymPanelChannelId);
+      const ch = message.guild!.channels.cache.get(settings.tellonymChannelId);
       if (!(ch instanceof TextChannel)) {
         await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Canal do painel não encontrado.")] });
         return;
@@ -83,7 +83,7 @@ export default async function setar(message: Message, args: string[]): Promise<v
         await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar tellonym painel #canal`")] });
         return;
       }
-      await db.update(guildSettingsTable).set({ tellonymPanelChannelId: channel.id }).where(eq(guildSettingsTable.id, guildId));
+      await db.update(guildSettingsTable).set({ tellonymChannelId: channel.id }).where(eq(guildSettingsTable.id, guildId));
       await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Canal do painel configurado: <#${channel.id}>`)] });
       return;
     }

@@ -25,7 +25,7 @@ export const guildSettingsTable = pgTable("guild_settings", {
   iconUrl:            text("icon_url"),
   memberCount:        integer("member_count").notNull().default(0),
   prefix:             text("prefix").notNull().default("l"),
-  tellonymPanelChannelId:   text("tellonym_panel_channel_id"),
+  tellonymChannelId:        text("tellonym_channel_id"),
   tellonymSendChannelId:    text("tellonym_send_channel_id"),
   tellonymApproveChannelId: text("tellonym_approve_channel_id"),
   tellonymBannerUrl:        text("tellonym_banner_url"),
