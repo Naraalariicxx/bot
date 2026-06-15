@@ -53,7 +53,7 @@ import anunciar from "../commands/admin/anunciar.js";
 import duelo from "../commands/games/duelo.js";
 
 // ── Tellonym (inline) ────────────────────────────────────────────────────────
-import { handleTellonym, handleInbox, buildTellonymModal, processTellonymModal, processTellonymApprove, processTellonymReject } from "./bot-features.js";
+import { handleInbox, buildTellonymModal, processTellonymModal, processTellonymApprove, processTellonymReject } from "./bot-features.js";
 
 // ── Aliases multilíngues → comando canônico ─────────────────────────────────
 const ALIASES: Record<string, string> = {
@@ -186,8 +186,6 @@ const ALIASES: Record<string, string> = {
   // duelo
   duelo:"duelo", duel:"duelo", batalha:"duelo", battle:"duelo", duell:"duelo",
   "デュエル":"duelo", "决斗":"duelo", "결투":"duelo",
-  // tellonym
-  tellonym:"tellonym", anon:"tellonym", anonimo:"tellonym", "anônimo":"tellonym",
   // inbox
   inbox:"inbox", caixa:"inbox", mensagens:"inbox",
   // play
@@ -331,7 +329,6 @@ export async function startBot(): Promise<void> {
         case "stop":       return void await stop(message);
         case "fila":       return void await fila(message);
         // Tellonym
-        case "tellonym":   return void await handleTellonym(message, args);
         case "inbox":      return void await handleInbox(message);
         // Admin
         case "dar":        return void await dar(message, args);
