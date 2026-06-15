@@ -78,8 +78,9 @@ export default async function ajuda(message: Message): Promise<void> {
       {
         name: "📬 Tellonym",
         value: [
-          `\`${PREFIX}tellonym @user <msg>\` — Enviar mensagem anônima`,
+          `\`${PREFIX}tellonym @user <msg>\` — Enviar mensagem anônima (via texto)`,
           `\`${PREFIX}inbox\` — Ver caixa de entrada`,
+          `> O painel interativo (botão) é criado pelo admin com \`${PREFIX}setar tellonym setup\``,
         ].join("\n"),
         inline: false,
       },
@@ -88,7 +89,9 @@ export default async function ajuda(message: Message): Promise<void> {
         value: [
           `\`${PREFIX}dar @user <valor>\` — Dar/remover coins`,
           `\`${PREFIX}setar prefix <val>\` — Mudar prefixo`,
-          `\`${PREFIX}setar tellonym #canal\` — Canal de notificações anônimas`,
+          `\`${PREFIX}setar tellonym #canal\` — Definir canal de tellonym`,
+          `\`${PREFIX}setar tellonym setup [@user]\` — Criar painel com botão no canal`,
+          `\`${PREFIX}setar tellonym banner <url>\` — Definir imagem do painel`,
           `\`${PREFIX}setar tellonym desativar\` — Desativar canal configurado`,
           `\`${PREFIX}resetar @user\` — Resetar economia`,
           `\`${PREFIX}anunciar <msg>\` — Fazer anúncio`,
