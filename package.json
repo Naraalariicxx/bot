@@ -8,8 +8,10 @@
     "dev": "tsx api-server/src/index.ts",
     "db:push": "drizzle-kit push --config=packages/db/drizzle.config.ts"
   },
+  "dependencies": {
+    "drizzle-kit": "^0.31.0"
+  },
   "devDependencies": {
-    "drizzle-kit": "^0.31.0",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3"
   }
