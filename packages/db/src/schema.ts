@@ -25,9 +25,11 @@ export const guildSettingsTable = pgTable("guild_settings", {
   iconUrl:            text("icon_url"),
   memberCount:        integer("member_count").notNull().default(0),
   prefix:             text("prefix").notNull().default("l"),
-  tellonymChannelId:  text("tellonym_channel_id"),
-  tellonymBannerUrl:  text("tellonym_banner_url"),
-  createdAt:          timestamp("created_at").notNull().default(sql`now()`),
+  tellonymPanelChannelId:   text("tellonym_panel_channel_id"),
+  tellonymSendChannelId:    text("tellonym_send_channel_id"),
+  tellonymApproveChannelId: text("tellonym_approve_channel_id"),
+  tellonymBannerUrl:        text("tellonym_banner_url"),
+  createdAt:                timestamp("created_at").notNull().default(sql`now()`),
 });
 
 export const commandLogsTable = pgTable("command_logs", {
@@ -62,6 +64,7 @@ export const tellonymTable = pgTable("tellonym", {
   message:        text("message").notNull(),
   reply:          text("reply"),
   isRead:         boolean("is_read").notNull().default(false),
+  status:         text("status").notNull().default("pending"),
   guildId:        text("guild_id").notNull(),
   guildName:      text("guild_name").notNull(),
   sentAt:         timestamp("sent_at").notNull().default(sql`now()`),

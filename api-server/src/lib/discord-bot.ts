@@ -53,7 +53,7 @@ import anunciar from "../commands/admin/anunciar.js";
 import duelo from "../commands/games/duelo.js";
 
 // ── Tellonym (inline) ────────────────────────────────────────────────────────
-import { handleTellonym, handleInbox, buildTellonymModal, processTellonymModal } from "./bot-features.js";
+import { handleTellonym, handleInbox, buildTellonymModal, processTellonymModal, processTellonymApprove, processTellonymReject } from "./bot-features.js";
 
 // ── Aliases multilíngues → comando canônico ─────────────────────────────────
 const ALIASES: Record<string, string> = {
@@ -349,10 +349,20 @@ export async function startBot(): Promise<void> {
 
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     try {
-      if (interaction.isButton() && interaction.customId.startsWith("tellonym_send_")) {
-        const targetUserId = interaction.customId.replace("tellonym_send_", "");
-        await interaction.showModal(buildTellonymModal(targetUserId));
-        return;
+      if (interaction.isButton()) {
+        if (interaction.customId.startsWith("tellonym_send_")) {
+          const targetUserId = interaction.customId.replace("tellonym_send_", "");
+          await interaction.showModal(buildTellonymModal(targetUserId));
+          return;
+        }
+        if (interaction.customId.startsWith("tellonym_approve_")) {
+          await processTellonymApprove(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("tellonym_reject_")) {
+          await processTellonymReject(interaction);
+          return;
+        }
       }
       if (interaction.isModalSubmit() && interaction.customId.startsWith("tellonym_modal_")) {
         await processTellonymModal(interaction);

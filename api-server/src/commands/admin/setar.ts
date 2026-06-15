@@ -13,7 +13,7 @@ export default async function setar(message: Message, args: string[]): Promise<v
   const subCmd = args[0]?.toLowerCase();
 
   if (!subCmd) {
-    await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar prefix <prefixo>` ou `lsetar tellonym #canal`")] });
+    await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar prefix <prefixo>` ou `lsetar tellonym painel #canal`")] });
     return;
   }
 
@@ -38,26 +38,31 @@ export default async function setar(message: Message, args: string[]): Promise<v
   }
 
   if (subCmd === "tellonym") {
-    const sub2 = args[1]?.toLowerCase();
-    if (sub2 === "desativar" || sub2 === "disable" || sub2 === "off") {
-      await db.update(guildSettingsTable).set({ tellonymChannelId: null }).where(eq(guildSettingsTable.id, message.guild!.id));
-      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription("✅ Canal do tellonym removido. Notificações serão enviadas por DM.")] });
+    const sub2  = args[1]?.toLowerCase();
+    const guildId = message.guild!.id;
+
+    if (sub2 === "desativar") {
+      await db.update(guildSettingsTable)
+        .set({ tellonymPanelChannelId: null, tellonymSendChannelId: null, tellonymApproveChannelId: null })
+        .where(eq(guildSettingsTable.id, guildId));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription("✅ Sistema de tellonym desativado.")] });
       return;
     }
+
     if (sub2 === "setup") {
-      const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, message.guild!.id));
-      if (!settings?.tellonymChannelId) {
-        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Configure o canal primeiro: `lsetar tellonym #canal`")] });
+      const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guildId));
+      if (!settings?.tellonymPanelChannelId) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Configure o canal do painel primeiro: `lsetar tellonym painel #canal`")] });
         return;
       }
-      const ch = message.guild!.channels.cache.get(settings.tellonymChannelId);
+      const ch = message.guild!.channels.cache.get(settings.tellonymPanelChannelId);
       if (!(ch instanceof TextChannel)) {
-        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Canal configurado não encontrado.")] });
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Canal do painel não encontrado.")] });
         return;
       }
       const targetUser = message.mentions.users.first() ?? message.author;
       await postTellonymPanel(ch, targetUser, settings.tellonymBannerUrl ?? null);
-      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Painel de tellonym criado em <#${ch.id}> para **${targetUser.username}**!`)] });
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Painel criado em <#${ch.id}> para **${targetUser.username}**!`)] });
       return;
     }
 
@@ -67,20 +72,55 @@ export default async function setar(message: Message, args: string[]): Promise<v
         await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Informe uma URL válida.\nEx: `lsetar tellonym banner https://...`")] });
         return;
       }
-      await db.update(guildSettingsTable).set({ tellonymBannerUrl: url }).where(eq(guildSettingsTable.id, message.guild!.id));
-      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Banner do tellonym atualizado!`).setImage(url)] });
+      await db.update(guildSettingsTable).set({ tellonymBannerUrl: url }).where(eq(guildSettingsTable.id, guildId));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription("✅ Banner atualizado!").setImage(url)] });
       return;
     }
 
-    const channel = message.mentions.channels.first();
-    if (!channel || channel.type !== ChannelType.GuildText) {
-      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Mencione um canal de texto!\nEx: `lsetar tellonym #canal`\nPara desativar: `lsetar tellonym desativar`")] });
+    if (sub2 === "painel") {
+      const channel = message.mentions.channels.first();
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar tellonym painel #canal`")] });
+        return;
+      }
+      await db.update(guildSettingsTable).set({ tellonymPanelChannelId: channel.id }).where(eq(guildSettingsTable.id, guildId));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Canal do painel configurado: <#${channel.id}>`)] });
       return;
     }
-    await db.update(guildSettingsTable).set({ tellonymChannelId: channel.id }).where(eq(guildSettingsTable.id, message.guild!.id));
-    await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Canal de tellonym configurado para <#${channel.id}>.\nAs notificações de mensagens anônimas serão enviadas lá.`)] });
+
+    if (sub2 === "enviar") {
+      const channel = message.mentions.channels.first();
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar tellonym enviar #canal`")] });
+        return;
+      }
+      await db.update(guildSettingsTable).set({ tellonymSendChannelId: channel.id }).where(eq(guildSettingsTable.id, guildId));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Canal de mensagens aprovadas: <#${channel.id}>`)] });
+      return;
+    }
+
+    if (sub2 === "aprovar") {
+      const channel = message.mentions.channels.first();
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Uso: `lsetar tellonym aprovar #canal`")] });
+        return;
+      }
+      await db.update(guildSettingsTable).set({ tellonymApproveChannelId: channel.id }).where(eq(guildSettingsTable.id, guildId));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Canal de moderação configurado: <#${channel.id}>`)] });
+      return;
+    }
+
+    await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription(
+      "❌ Subcomando inválido. Opções:\n" +
+      "`lsetar tellonym painel #canal` — canal do painel\n" +
+      "`lsetar tellonym enviar #canal` — canal de msgs aprovadas\n" +
+      "`lsetar tellonym aprovar #canal` — canal de moderação\n" +
+      "`lsetar tellonym setup [@user]` — criar painel com botão\n" +
+      "`lsetar tellonym banner <url>` — imagem do painel\n" +
+      "`lsetar tellonym desativar` — desativar tudo"
+    )] });
     return;
   }
 
-  await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Subcomando desconhecido.\nUse `lsetar prefix <valor>` ou `lsetar tellonym #canal`")] });
+  await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Subcomando desconhecido.")] });
 }

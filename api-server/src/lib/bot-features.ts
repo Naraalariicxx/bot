@@ -2,7 +2,7 @@ import {
   Message, TextChannel, NewsChannel, User,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ModalBuilder, TextInputBuilder, TextInputStyle,
-  ModalSubmitInteraction,
+  ModalSubmitInteraction, ButtonInteraction,
 } from "discord.js";
 import { db, usersTable, duelsTable, tellonymTable, guildSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -12,19 +12,14 @@ function isSendable(ch: Message["channel"]): ch is TextChannel | NewsChannel {
   return ch instanceof TextChannel || ch instanceof NewsChannel;
 }
 
+// ── Duelo (legado) ────────────────────────────────────────────────────────────
 export async function handleDuel(message: Message, args: string[]): Promise<void> {
-  const guild = message.guild!;
+  const guild     = message.guild!;
   const challenger = message.author;
-  const mention = message.mentions.users.first();
+  const mention   = message.mentions.users.first();
 
-  if (!mention) {
-    await message.reply("❌ Mencione um usuário para duelar! Ex: `lduelo @usuario 500`");
-    return;
-  }
-  if (mention.id === challenger.id || mention.bot) {
-    await message.reply("❌ Alvo inválido para duelo.");
-    return;
-  }
+  if (!mention) { await message.reply("❌ Mencione um usuário para duelar! Ex: `lduelo @usuario 500`"); return; }
+  if (mention.id === challenger.id || mention.bot) { await message.reply("❌ Alvo inválido para duelo."); return; }
 
   const bet = Math.max(0, parseInt(args.find((a) => /^\d+$/.test(a)) ?? "0", 10));
 
@@ -56,15 +51,10 @@ export async function handleDuel(message: Message, args: string[]): Promise<void
   }
 
   await db.insert(duelsTable).values({
-    challengerId: challenger.id,
-    challengerUsername: challenger.username,
-    challengedId: mention.id,
-    challengedUsername: mention.username,
-    winnerId: winner.id,
-    winnerUsername: winner.username,
-    bet,
-    guildId: guild.id,
-    guildName: guild.name,
+    challengerId: challenger.id, challengerUsername: challenger.username,
+    challengedId: mention.id,   challengedUsername: mention.username,
+    winnerId: winner.id,        winnerUsername: winner.username,
+    bet, guildId: guild.id, guildName: guild.name,
   });
 
   const betText = bet > 0 ? ` por **${bet.toLocaleString("pt-BR")} coins**` : "";
@@ -74,98 +64,29 @@ export async function handleDuel(message: Message, args: string[]): Promise<void
   );
 }
 
-export async function handleTellonym(message: Message, args: string[]): Promise<void> {
-  const guild = message.guild!;
-  const sender = message.author;
-  const mention = message.mentions.users.first();
-
-  if (!mention) {
-    await message.reply("❌ Mencione um usuário! Ex: `ltellonym @usuario sua mensagem aqui`");
-    return;
-  }
-  if (mention.bot) {
-    await message.reply("❌ Não é possível enviar mensagem para um bot!");
-    return;
-  }
-
-  const msgText = message.content
-    .replace(`<@${mention.id}>`, "")
-    .replace(`<@!${mention.id}>`, "")
-    .slice("ltellonym".length + 1)
-    .trim();
-
-  if (!msgText || msgText.length < 2) {
-    await message.reply("❌ A mensagem está vazia! Ex: `ltellonym @usuario sua mensagem`");
-    return;
-  }
-  if (msgText.length > 500) {
-    await message.reply("❌ Mensagem muito longa! Máximo de 500 caracteres.");
-    return;
-  }
-
-  await ensureUser(mention.id, mention.username, mention.discriminator, mention.displayAvatarURL(), guild.id);
-
-  await db.insert(tellonymTable).values({
-    targetUserId: mention.id,
-    targetUsername: mention.username,
-    message: msgText,
-    isRead: false,
-    guildId: guild.id,
-    guildName: guild.name,
-  });
-
-  try { await message.delete(); } catch { /* no perm */ }
-
-  const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guild.id));
-  const tellonymChannelId = settings?.tellonymChannelId;
-
-  if (tellonymChannelId) {
-    const ch = guild.channels.cache.get(tellonymChannelId);
-    if (ch instanceof TextChannel) {
-      await ch.send(`📬 **${mention}** você recebeu uma mensagem anônima!\n> ${msgText}\n\n_Use \`linbox\` para ver sua caixa de entrada._`).catch(() => null);
-    }
-  } else {
-    try {
-      await mention.send(
-        `📬 **Você recebeu uma mensagem anônima em ${guild.name}!**\n\n> ${msgText}\n\n_Use \`linbox\` no servidor para ver sua caixa de entrada._`
-      );
-    } catch {
-      if (isSendable(message.channel)) {
-        const dm = await message.channel.send(`📬 **${mention}**, você recebeu uma mensagem anônima! Use \`linbox\` para ver.`);
-        setTimeout(() => dm.delete().catch(() => null), 8000);
-      }
-    }
-  }
-
-  if (isSendable(message.channel)) {
-    const confirm = await message.channel.send(`✅ <@${sender.id}> Mensagem anônima enviada para **${mention.username}**!`);
-    setTimeout(() => confirm.delete().catch(() => null), 5000);
-  }
-}
-
+// ── Tellonym: inbox ───────────────────────────────────────────────────────────
 export async function handleInbox(message: Message): Promise<void> {
   const userId = message.author.id;
-  const messages = await db.select().from(tellonymTable).where(eq(tellonymTable.targetUserId, userId)).orderBy(tellonymTable.sentAt);
+  const messages = await db.select().from(tellonymTable)
+    .where(eq(tellonymTable.targetUserId, userId))
+    .orderBy(tellonymTable.sentAt);
 
-  if (!messages.length) {
-    await message.reply("📭 Sua caixa de entrada está vazia.");
-    return;
-  }
+  if (!messages.length) { await message.reply("📭 Sua caixa de entrada está vazia."); return; }
 
   await db.update(tellonymTable).set({ isRead: true }).where(eq(tellonymTable.targetUserId, userId));
 
-  const unread = messages.filter((m) => !m.isRead);
+  const unread  = messages.filter((m) => !m.isRead);
   const preview = messages.slice(-5).reverse();
-
-  const lines = preview.map((m, i) => `**${i + 1}.** ${m.message}${m.reply ? `\n   ↩️ *${m.reply}*` : ""}`).join("\n\n");
+  const lines   = preview.map((m, i) => `**${i + 1}.** ${m.message}${m.reply ? `\n   ↩️ *${m.reply}*` : ""}`).join("\n\n");
 
   await message.reply(
     `📬 **Sua caixa de entrada** (${messages.length} total, ${unread.length} não lidas)\n\n` +
     lines +
-    (messages.length > 5 ? `\n\n_...e mais ${messages.length - 5} mensagens. Veja todas no dashboard._` : "")
+    (messages.length > 5 ? `\n\n_...e mais ${messages.length - 5} mensagens._` : "")
   );
 }
 
+// ── Tellonym: painel com botão ────────────────────────────────────────────────
 export async function postTellonymPanel(channel: TextChannel, targetUser: User, bannerUrl: string | null): Promise<void> {
   const embed = new EmbedBuilder()
     .setColor(0x7B2FBE)
@@ -187,6 +108,7 @@ export async function postTellonymPanel(channel: TextChannel, targetUser: User, 
   await channel.send({ embeds: [embed], components: [row] });
 }
 
+// ── Tellonym: modal ───────────────────────────────────────────────────────────
 export function buildTellonymModal(targetUserId: string): ModalBuilder {
   const modal = new ModalBuilder()
     .setCustomId(`tellonym_modal_${targetUserId}`)
@@ -205,40 +127,104 @@ export function buildTellonymModal(targetUserId: string): ModalBuilder {
   return modal;
 }
 
+// ── Tellonym: submit modal → canal de aprovação ───────────────────────────────
 export async function processTellonymModal(interaction: ModalSubmitInteraction): Promise<void> {
   const targetUserId = interaction.customId.replace("tellonym_modal_", "");
-  const msgText = interaction.fields.getTextInputValue("tellonym_message").trim();
-  const guild = interaction.guild!;
+  const msgText      = interaction.fields.getTextInputValue("tellonym_message").trim();
+  const guild        = interaction.guild!;
 
-  const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
+  const targetMember   = await guild.members.fetch(targetUserId).catch(() => null);
   const targetUsername = targetMember?.user.username ?? "desconhecido";
 
-  await db.insert(tellonymTable).values({
-    targetUserId,
-    targetUsername,
-    message: msgText,
-    isRead: false,
-    guildId: guild.id,
-    guildName: guild.name,
-  });
+  const [row] = await db.insert(tellonymTable).values({
+    targetUserId, targetUsername, message: msgText,
+    isRead: false, status: "pending",
+    guildId: guild.id, guildName: guild.name,
+  }).returning();
 
-  await interaction.reply({ content: "✅ Mensagem anônima enviada com sucesso!", ephemeral: true });
+  await interaction.reply({ content: "✅ Mensagem enviada! Aguarde a aprovação.", ephemeral: true });
 
   const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guild.id));
-  const channelId = settings?.tellonymChannelId;
-  if (!channelId) return;
+  const approveChannelId = settings?.tellonymApproveChannelId;
+  if (!approveChannelId) return;
 
-  const ch = guild.channels.cache.get(channelId);
-  if (!(ch instanceof TextChannel)) return;
+  const approveCh = guild.channels.cache.get(approveChannelId);
+  if (!(approveCh instanceof TextChannel)) return;
 
-  const notifEmbed = new EmbedBuilder()
-    .setColor(0x7B2FBE)
-    .setTitle("📬 Nova mensagem anônima!")
-    .setDescription(`**${targetMember?.toString() ?? targetUsername}** você recebeu uma mensagem!\n\n> ${msgText}`)
-    .setFooter({ text: "Use linbox para ver sua caixa de entrada" })
+  const approveEmbed = new EmbedBuilder()
+    .setColor(0xFEE75C)
+    .setTitle("📬 Nova mensagem tellonym")
+    .setDescription(`**Para:** ${targetMember?.toString() ?? targetUsername}\n\n> ${msgText}`)
+    .setFooter({ text: `ID #${row.id}` })
     .setTimestamp();
 
-  await ch.send({ embeds: [notifEmbed] }).catch(() => null);
+  const approveRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tellonym_approve_${row.id}`)
+      .setLabel("✅ Aprovar")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`tellonym_reject_${row.id}`)
+      .setLabel("❌ Rejeitar")
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  await approveCh.send({ embeds: [approveEmbed], components: [approveRow] });
+}
+
+// ── Tellonym: aprovar / rejeitar ──────────────────────────────────────────────
+export async function processTellonymApprove(interaction: ButtonInteraction): Promise<void> {
+  const msgId  = parseInt(interaction.customId.replace("tellonym_approve_", ""), 10);
+  const guild  = interaction.guild!;
+
+  const [tell] = await db.select().from(tellonymTable).where(eq(tellonymTable.id, msgId));
+  if (!tell) { await interaction.reply({ content: "❌ Mensagem não encontrada.", ephemeral: true }); return; }
+
+  await db.update(tellonymTable).set({ status: "approved" }).where(eq(tellonymTable.id, msgId));
+
+  const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guild.id));
+  const sendChannelId = settings?.tellonymSendChannelId;
+
+  if (sendChannelId) {
+    const sendCh = guild.channels.cache.get(sendChannelId);
+    if (sendCh instanceof TextChannel) {
+      const publicEmbed = new EmbedBuilder()
+        .setColor(0x7B2FBE)
+        .setTitle(`📬 TELLONYM – ${tell.targetUsername.toUpperCase()}`)
+        .setDescription(`> ${tell.message}`)
+        .setTimestamp();
+      await sendCh.send({ embeds: [publicEmbed] });
+    }
+  }
+
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle("✅ Mensagem aprovada")
+        .setDescription(`> ${tell.message}`)
+        .setFooter({ text: `Aprovado por ${interaction.user.username}` })
+        .setTimestamp()
+    ],
+    components: [],
+  });
+}
+
+export async function processTellonymReject(interaction: ButtonInteraction): Promise<void> {
+  const msgId = parseInt(interaction.customId.replace("tellonym_reject_", ""), 10);
+
+  await db.update(tellonymTable).set({ status: "rejected" }).where(eq(tellonymTable.id, msgId));
+
+  await interaction.update({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0xED4245)
+        .setTitle("❌ Mensagem rejeitada")
+        .setFooter({ text: `Rejeitado por ${interaction.user.username}` })
+        .setTimestamp()
+    ],
+    components: [],
+  });
 }
 
 async function ensureUser(userId: string, username: string, discriminator: string, avatarUrl: string, guildId: string): Promise<void> {
