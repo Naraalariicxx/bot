@@ -1,0 +1,16 @@
+{
+  "name": "discord-bot",
+  "private": true,
+  "workspaces": ["packages/*", "api-server"],
+  "scripts": {
+    "build": "npm run build -w packages/db && npm run build -w api-server",
+    "start": "node api-server/dist/index.js",
+    "dev": "tsx api-server/src/index.ts",
+    "db:push": "drizzle-kit push --config=packages/db/drizzle.config.ts"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}
