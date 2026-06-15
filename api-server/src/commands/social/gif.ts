@@ -1,14 +1,28 @@
 import { EmbedBuilder, Message } from "discord.js";
 import { COLOR_PRIMARY } from "../util.js";
+import { logger } from "../../lib/logger.js";
 
 const API = "https://nekos.best/api/v2";
 
 async function fetchGif(category: string): Promise<string | null> {
   try {
-    const res = await fetch(`${API}/${category}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${API}/${category}`, {
+      signal: controller.signal,
+      headers: { "User-Agent": "LuxBot/1.0 (Discord Bot)" },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      logger.warn({ category, status: res.status }, "nekos.best non-ok response");
+      return null;
+    }
     const json = (await res.json()) as { results?: { url: string }[] };
-    return json.results?.[0]?.url ?? null;
-  } catch {
+    const url = json.results?.[0]?.url ?? null;
+    if (!url) logger.warn({ category, json }, "nekos.best no url in response");
+    return url;
+  } catch (err) {
+    logger.error({ category, err: String(err) }, "fetchGif failed");
     return null;
   }
 }
