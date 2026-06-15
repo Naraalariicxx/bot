@@ -2,6 +2,7 @@ import { EmbedBuilder, Message, PermissionFlagsBits, ChannelType, TextChannel } 
 import { db, guildSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { COLOR_SUCCESS, COLOR_ERROR, authorFooter } from "../util.js";
+import { postTellonymPanel } from "../../lib/bot-features.js";
 
 export default async function setar(message: Message, args: string[]): Promise<void> {
   if (!message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -43,6 +44,34 @@ export default async function setar(message: Message, args: string[]): Promise<v
       await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription("✅ Canal do tellonym removido. Notificações serão enviadas por DM.")] });
       return;
     }
+    if (sub2 === "setup") {
+      const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, message.guild!.id));
+      if (!settings?.tellonymChannelId) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Configure o canal primeiro: `lsetar tellonym #canal`")] });
+        return;
+      }
+      const ch = message.guild!.channels.cache.get(settings.tellonymChannelId);
+      if (!(ch instanceof TextChannel)) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Canal configurado não encontrado.")] });
+        return;
+      }
+      const targetUser = message.mentions.users.first() ?? message.author;
+      await postTellonymPanel(ch, targetUser, settings.tellonymBannerUrl ?? null);
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Painel de tellonym criado em <#${ch.id}> para **${targetUser.username}**!`)] });
+      return;
+    }
+
+    if (sub2 === "banner") {
+      const url = args[2];
+      if (!url || !url.startsWith("http")) {
+        await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Informe uma URL válida.\nEx: `lsetar tellonym banner https://...`")] });
+        return;
+      }
+      await db.update(guildSettingsTable).set({ tellonymBannerUrl: url }).where(eq(guildSettingsTable.id, message.guild!.id));
+      await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_SUCCESS).setDescription(`✅ Banner do tellonym atualizado!`).setImage(url)] });
+      return;
+    }
+
     const channel = message.mentions.channels.first();
     if (!channel || channel.type !== ChannelType.GuildText) {
       await message.reply({ embeds: [new EmbedBuilder().setColor(COLOR_ERROR).setDescription("❌ Mencione um canal de texto!\nEx: `lsetar tellonym #canal`\nPara desativar: `lsetar tellonym desativar`")] });

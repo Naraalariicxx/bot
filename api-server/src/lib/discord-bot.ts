@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events } from "discord.js";
+import { Client, GatewayIntentBits, Events, Interaction } from "discord.js";
 import { db, usersTable, commandLogsTable, guildSettingsTable, duelsTable, tellonymTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger.js";
@@ -53,7 +53,7 @@ import anunciar from "../commands/admin/anunciar.js";
 import duelo from "../commands/games/duelo.js";
 
 // ── Tellonym (inline) ────────────────────────────────────────────────────────
-import { handleTellonym, handleInbox } from "./bot-features.js";
+import { handleTellonym, handleInbox, buildTellonymModal, processTellonymModal } from "./bot-features.js";
 
 // ── Aliases multilíngues → comando canônico ─────────────────────────────────
 const ALIASES: Record<string, string> = {
@@ -344,6 +344,22 @@ export async function startBot(): Promise<void> {
     } catch (err) {
       logger.error({ err, cmd }, "Command error");
       try { await message.reply("❌ Ocorreu um erro ao executar o comando."); } catch { /* ignore */ }
+    }
+  });
+
+  client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    try {
+      if (interaction.isButton() && interaction.customId.startsWith("tellonym_send_")) {
+        const targetUserId = interaction.customId.replace("tellonym_send_", "");
+        await interaction.showModal(buildTellonymModal(targetUserId));
+        return;
+      }
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("tellonym_modal_")) {
+        await processTellonymModal(interaction);
+        return;
+      }
+    } catch (err) {
+      logger.error({ err }, "Interaction error");
     }
   });
 

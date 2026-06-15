@@ -26,6 +26,7 @@ export const guildSettingsTable = pgTable("guild_settings", {
   memberCount:        integer("member_count").notNull().default(0),
   prefix:             text("prefix").notNull().default("l"),
   tellonymChannelId:  text("tellonym_channel_id"),
+  tellonymBannerUrl:  text("tellonym_banner_url"),
   createdAt:          timestamp("created_at").notNull().default(sql`now()`),
 });
 

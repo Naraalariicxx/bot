@@ -1,4 +1,9 @@
-import { Message, TextChannel, NewsChannel } from "discord.js";
+import {
+  Message, TextChannel, NewsChannel, User,
+  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  ModalBuilder, TextInputBuilder, TextInputStyle,
+  ModalSubmitInteraction,
+} from "discord.js";
 import { db, usersTable, duelsTable, tellonymTable, guildSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger.js";
@@ -159,6 +164,81 @@ export async function handleInbox(message: Message): Promise<void> {
     lines +
     (messages.length > 5 ? `\n\n_...e mais ${messages.length - 5} mensagens. Veja todas no dashboard._` : "")
   );
+}
+
+export async function postTellonymPanel(channel: TextChannel, targetUser: User, bannerUrl: string | null): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(0x7B2FBE)
+    .setTitle(`TELLONYM – ${targetUser.displayName.toUpperCase()} 📋`)
+    .setDescription(
+      `▸ Mande sua mensagem de forma anônima ou se preferir pode enviar mostrando seu perfil.\n` +
+      `▸ Perguntas, opiniões, indiretas ou o que quiserem falar e expressar.`
+    );
+
+  if (bannerUrl) embed.setImage(bannerUrl);
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tellonym_send_${targetUser.id}`)
+      .setLabel("Enviar Tellonym")
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  await channel.send({ embeds: [embed], components: [row] });
+}
+
+export function buildTellonymModal(targetUserId: string): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId(`tellonym_modal_${targetUserId}`)
+    .setTitle("Enviar Mensagem Anônima");
+
+  const input = new TextInputBuilder()
+    .setCustomId("tellonym_message")
+    .setLabel("Sua mensagem")
+    .setStyle(TextInputStyle.Paragraph)
+    .setPlaceholder("Digite sua mensagem aqui...")
+    .setMinLength(2)
+    .setMaxLength(500)
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+  return modal;
+}
+
+export async function processTellonymModal(interaction: ModalSubmitInteraction): Promise<void> {
+  const targetUserId = interaction.customId.replace("tellonym_modal_", "");
+  const msgText = interaction.fields.getTextInputValue("tellonym_message").trim();
+  const guild = interaction.guild!;
+
+  const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
+  const targetUsername = targetMember?.user.username ?? "desconhecido";
+
+  await db.insert(tellonymTable).values({
+    targetUserId,
+    targetUsername,
+    message: msgText,
+    isRead: false,
+    guildId: guild.id,
+    guildName: guild.name,
+  });
+
+  await interaction.reply({ content: "✅ Mensagem anônima enviada com sucesso!", ephemeral: true });
+
+  const [settings] = await db.select().from(guildSettingsTable).where(eq(guildSettingsTable.id, guild.id));
+  const channelId = settings?.tellonymChannelId;
+  if (!channelId) return;
+
+  const ch = guild.channels.cache.get(channelId);
+  if (!(ch instanceof TextChannel)) return;
+
+  const notifEmbed = new EmbedBuilder()
+    .setColor(0x7B2FBE)
+    .setTitle("📬 Nova mensagem anônima!")
+    .setDescription(`**${targetMember?.toString() ?? targetUsername}** você recebeu uma mensagem!\n\n> ${msgText}`)
+    .setFooter({ text: "Use linbox para ver sua caixa de entrada" })
+    .setTimestamp();
+
+  await ch.send({ embeds: [notifEmbed] }).catch(() => null);
 }
 
 async function ensureUser(userId: string, username: string, discriminator: string, avatarUrl: string, guildId: string): Promise<void> {
